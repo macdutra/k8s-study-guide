@@ -253,10 +253,27 @@ kubectl create deployment hello-minikube --image=kicbase/echo-server:1.0
 kubectl expose deployment hello-minikube --type=NodePort --port=8080
 
 # Get the service URL
+# ⚠️ MINIKUBE ONLY (not in exam):
 minikube service hello-minikube --url
 
+# ✅ EXAM-SAFE ALTERNATIVE:
+# Get NodePort
+kubectl get svc hello-minikube
+NODE_PORT=$(kubectl get svc hello-minikube -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_IP=$(minikube ip)  # In exam: kubectl get nodes -o wide
+echo "Service URL: http://$NODE_IP:$NODE_PORT"
+
 # Access the service
+# ⚠️ MINIKUBE WAY:
 curl $(minikube service hello-minikube --url)
+
+# ✅ EXAM-SAFE WAY:
+curl http://$NODE_IP:$NODE_PORT
+
+# OR use port-forward (works everywhere):
+kubectl port-forward svc/hello-minikube 8080:8080 &
+curl http://localhost:8080
+pkill -f "port-forward"
 
 # Clean up
 kubectl delete deployment hello-minikube
@@ -554,27 +571,55 @@ minikube delete --all --purge
 ### Useful Commands
 
 ```bash
-# Get minikube IP
+# Get minikube IP (⚠️ Local only - NOT in exam)
 minikube ip
 
-# SSH into minikube
+# ✅ EXAM-SAFE: Get node IP
+kubectl get nodes -o wide  # Shows INTERNAL-IP column
+
+# SSH into minikube (⚠️ Local only)
 minikube ssh
 
-# Open Kubernetes dashboard
+# ✅ EXAM-SAFE: SSH to node (if needed)
+# ssh user@node-ip  (using cluster credentials)
+
+# Open Kubernetes dashboard (⚠️ Local only)
 minikube dashboard
 
-# Access service in browser
+# ✅ EXAM-SAFE: View resources
+kubectl get all -A
+kubectl top nodes
+kubectl top pods
+
+# Access service in browser (⚠️ Local only)
 minikube service <service-name>
 
-# Mount local directory
+# ✅ EXAM-SAFE: Access service
+kubectl port-forward svc/<service-name> 8080:80
+# Or for NodePort:
+kubectl get svc <service-name>  # Get NodePort
+kubectl get nodes -o wide        # Get Node IP
+# Access: http://<NODE-IP>:<NODE-PORT>
+
+# Mount local directory (⚠️ Local only)
 minikube mount /local/path:/minikube/path
 
-# View logs
+# View logs (⚠️ Local only for minikube)
 minikube logs
 
-# Update minikube
+# ✅ EXAM-SAFE: View logs
+kubectl logs <pod-name>
+kubectl logs <pod-name> -c <container-name>
+kubectl logs -f <pod-name>  # Follow logs
+
+# Update minikube (⚠️ Local only)
 brew upgrade minikube
 ```
+
+### Legend
+
+- ⚠️ **Local only** - These commands work in minikube but NOT in the CKA exam
+- ✅ **EXAM-SAFE** - These commands work everywhere, including the exam
 
 ---
 

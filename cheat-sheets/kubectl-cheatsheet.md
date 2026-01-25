@@ -529,8 +529,21 @@ kubectl create deployment nginx --image=nginx --replicas=3
 # Expose as NodePort
 kubectl expose deployment nginx --port=80 --type=NodePort
 
-# Get service URL (minikube)
+# Get service details
+kubectl get svc nginx
+
+# ⚠️ MINIKUBE ONLY (not in exam):
 minikube service nginx --url
+
+# ✅ EXAM-SAFE: Get service URL
+NODE_PORT=$(kubectl get svc nginx -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+echo "http://$NODE_IP:$NODE_PORT"
+
+# ✅ EXAM-SAFE: Test with port-forward
+kubectl port-forward svc/nginx 8080:80
+curl http://localhost:8080
+# Press Ctrl+C to stop port-forward
 
 # Scale up
 kubectl scale deployment nginx --replicas=5
