@@ -126,16 +126,23 @@ fi
 # Install additional tools
 print_header "Installing Additional Tools"
 
+print_info "NOTE: Some tools (jq, yq, tree, k9s) are NOT available in the CKA exam"
+print_info "They're useful for learning, but practice exam tasks without them too!"
+echo ""
+
 tools=("k9s" "kubectx" "jq" "yq" "watch" "tree")
 for tool in "${tools[@]}"; do
     if ! command -v "$tool" &>/dev/null; then
         print_info "Installing $tool..."
         brew install "$tool"
-        print_success "$tool installed"
+        print_success "$tool installed (for study only)"
     else
         print_success "$tool already installed"
     fi
 done
+
+print_info ""
+print_info "Remember: During the exam, you'll only have kubectl, vim, and basic Linux tools"
 
 # Configure Minikube
 print_header "Configuring Minikube"

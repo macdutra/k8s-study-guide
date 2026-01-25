@@ -176,6 +176,7 @@ kubectl get nodes
 
 ### Quick References
 
+- **[EXAM-ENVIRONMENT.md](EXAM-ENVIRONMENT.md)** - What tools are available during the actual CKA exam
 - **[kubectl Cheat Sheet](cheat-sheets/kubectl-cheatsheet.md)** - Essential kubectl commands
 - **[YAML Templates](cheat-sheets/yaml-templates.md)** - Common resource templates
 - **[Troubleshooting Guide](cheat-sheets/troubleshooting.md)** - Common issues and solutions
