@@ -95,7 +95,15 @@ EOF
 
 ### Step 3: Test Ingress
 
+**Important:** On Minikube, you need `minikube tunnel` running for Ingress to work properly.
+
 ```bash
+# Terminal 1 - Start minikube tunnel (keep this running!)
+minikube tunnel
+# Enter your macOS password when prompted
+# Keep this terminal open!
+
+# Terminal 2 - Test your ingress
 # Get minikube IP
 MINIKUBE_IP=$(minikube ip)
 echo $MINIKUBE_IP
@@ -106,8 +114,22 @@ echo "$MINIKUBE_IP example.local" | sudo tee -a /etc/hosts
 # Test with curl
 curl http://example.local
 
-# Or test with Host header
+# Or test with Host header (if /etc/hosts not updated)
 curl -H "Host: example.local" http://$MINIKUBE_IP
+```
+
+**Alternative - Port-Forward (If Tunnel Has Issues):**
+
+```bash
+# If minikube tunnel doesn't work, use port-forward
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
+
+# Then test
+curl -H "Host: example.local" http://localhost:8080
+
+# Or add to /etc/hosts for browser
+echo "127.0.0.1 example.local" | sudo tee -a /etc/hosts
+# Visit: http://example.local:8080
 ```
 
 ### Understanding Ingress YAML
@@ -140,18 +162,121 @@ Route traffic based on URL path.
 
 ### Create Multiple Services
 
+**Note:** The `kubectl create deployment` command doesn't work well with images requiring arguments. Use YAML instead:
+
 ```bash
+# Create all three apps with correct YAML
+cat <<'EOF' | kubectl apply -f -
 # App 1
-kubectl create deployment app1 --image=hashicorp/http-echo -- -text="App 1"
-kubectl expose deployment app1 --port=5678 --name=app1-service
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+    spec:
+      containers:
+      - name: http-echo
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text=App 1"
+        - "-listen=:5678"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-service
+spec:
+  selector:
+    app: app1
+  ports:
+  - port: 5678
+    targetPort: 5678
+---
 # App 2
-kubectl create deployment app2 --image=hashicorp/http-echo -- -text="App 2"
-kubectl expose deployment app2 --port=5678 --name=app2-service
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+      - name: http-echo
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text=App 2"
+        - "-listen=:5678"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-service
+spec:
+  selector:
+    app: app2
+  ports:
+  - port: 5678
+    targetPort: 5678
+---
 # App 3
-kubectl create deployment app3 --image=hashicorp/http-echo -- -text="App 3"
-kubectl expose deployment app3 --port=5678 --name=app3-service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3
+  template:
+    metadata:
+      labels:
+        app: app3
+    spec:
+      containers:
+      - name: http-echo
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text=App 3"
+        - "-listen=:5678"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-service
+spec:
+  selector:
+    app: app3
+  ports:
+  - port: 5678
+    targetPort: 5678
+EOF
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app=app1 --timeout=60s
+kubectl wait --for=condition=ready pod -l app=app2 --timeout=60s
+kubectl wait --for=condition=ready pod -l app=app3 --timeout=60s
 ```
 
 ### Create Path-Based Ingress
@@ -559,7 +684,78 @@ curl -H "Host: example.local" http://$(minikube ip)
 minikube ip
 ```
 
-#### 4. TLS Not Working
+#### 4. Minikube Tunnel Issues
+
+**Problem: Connection refused on 127.0.0.1**
+
+```bash
+# Issue: EXTERNAL-IP shows 127.0.0.1 but connection refused
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+# Shows: EXTERNAL-IP 127.0.0.1
+
+# Test fails:
+curl http://127.0.0.1
+# Error: Connection refused
+
+# Solution: Use Minikube IP instead
+curl -H "Host: example.local" http://$(minikube ip)
+
+# Add to /etc/hosts with Minikube IP (not 127.0.0.1)
+echo "$(minikube ip) example.local" | sudo tee -a /etc/hosts
+curl http://example.local  # Now works!
+```
+
+**Problem: Service type is NodePort instead of LoadBalancer**
+
+```bash
+# Check service type
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+
+# If TYPE shows "NodePort" instead of "LoadBalancer":
+# Fix: Patch to LoadBalancer
+kubectl patch svc ingress-nginx-controller -n ingress-nginx \
+  -p '{"spec":{"type":"LoadBalancer"}}'
+
+# Restart tunnel
+pkill -f "minikube tunnel"
+minikube tunnel
+```
+
+**Problem: Tunnel not starting properly**
+
+```bash
+# Clean up old tunnel
+minikube tunnel --cleanup
+pkill -f "minikube tunnel"
+
+# Check nothing is using port 80
+sudo lsof -i :80
+
+# Start tunnel fresh
+minikube tunnel
+# Enter password when prompted
+# Keep terminal open!
+
+# Verify in new terminal
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+# EXTERNAL-IP should appear (may take 10-15 seconds)
+```
+
+**Alternative: Always Use Port-Forward (Most Reliable)**
+
+```bash
+# If tunnel keeps failing, use port-forward instead
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
+
+# Test
+curl -H "Host: example.local" http://localhost:8080
+
+# For browser, add to /etc/hosts:
+echo "127.0.0.1 example.local" | sudo tee -a /etc/hosts
+# Visit: http://example.local:8080
+```
+
+#### 5. TLS Not Working
 
 ```bash
 # Check secret exists

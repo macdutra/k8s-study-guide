@@ -98,9 +98,12 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-## 📖 Study Path
+## 📊 Study Materials
 
-### 🟢 Week 1: Foundations
+### Comprehensive Study Path
+
+- **[COVERAGE-ANALYSIS.md](COVERAGE-ANALYSIS.md)** - 🎯 What you have vs. what you need for 100% exam coverage
+- **[Week 1 Study Plan](README.md#-week-1-foundations)** - Foundations (HPA, Ingress, Resources, Storage)
 
 **Objective**: Master core Kubernetes concepts and resource management
 
@@ -176,9 +179,10 @@ kubectl get nodes
 
 ### Quick References
 
-- **[MINIKUBE-VS-KUBECTL.md](MINIKUBE-VS-KUBECTL.md)** - ⚠️ Critical: Minikube commands vs kubectl equivalents for exam
-- **[ADDON-INSTALLATION.md](ADDON-INSTALLATION.md)** - How to install metrics-server, ingress, and other add-ons with kubectl
-- **[EXAM-ENVIRONMENT.md](EXAM-ENVIRONMENT.md)** - What tools are available during the actual CKA exam
+- **[USING-DOCUMENTATION.md](USING-DOCUMENTATION.md)** - 📖 How to find YAML examples during the exam (kubectl explain, docs, etc.)
+- **[MINIKUBE-VS-KUBECTL.md](MINIKUBE-VS-KUBECTL.md)** - ⚠️ Minikube commands vs kubectl equivalents
+- **[ADDON-INSTALLATION.md](ADDON-INSTALLATION.md)** - Installing metrics-server, ingress, and other add-ons
+- **[EXAM-ENVIRONMENT.md](EXAM-ENVIRONMENT.md)** - What tools are available during the exam
 - **[kubectl Cheat Sheet](cheat-sheets/kubectl-cheatsheet.md)** - Essential kubectl commands
 - **[YAML Templates](cheat-sheets/yaml-templates.md)** - Common resource templates
 - **[Troubleshooting Guide](cheat-sheets/troubleshooting.md)** - Common issues and solutions
