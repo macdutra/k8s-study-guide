@@ -49,20 +49,26 @@ minikube ssh "cat /etc/cni/net.d/*" | grep -i network
 kubectl create namespace netpol-test
 kubectl config set-context --current --namespace=netpol-test
 
-# Create frontend pod
-kubectl run frontend --image=nginx --labels="tier=frontend"
+# Create frontend pod (using busybox with wget)
+kubectl run frontend --image=busybox --labels="tier=frontend" \
+  -- sleep 3600
 
-# Create backend pod
+# Create backend pod (nginx for web server)
 kubectl run backend --image=nginx --labels="tier=backend"
 
 # Create database pod
-kubectl run database --image=postgres --labels="tier=database" \
+kubectl run database --image=postgres:alpine --labels="tier=database" \
   --env="POSTGRES_PASSWORD=secret"
 
 # Expose services
 kubectl expose pod frontend --port=80
 kubectl expose pod backend --port=80
 kubectl expose pod database --port=5432
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod frontend --timeout=60s
+kubectl wait --for=condition=ready pod backend --timeout=60s
+kubectl wait --for=condition=ready pod database --timeout=60s
 ```
 
 ## Basic NetworkPolicy
@@ -490,9 +496,9 @@ Setup a 3-tier app with proper network isolation.
 
 ```bash
 # Create pods
-kubectl run frontend --image=nginx --labels="tier=frontend"
+kubectl run frontend --image=busybox --labels="tier=frontend" -- sleep 3600
 kubectl run backend --image=nginx --labels="tier=backend"
-kubectl run database --image=postgres --labels="tier=database" \
+kubectl run database --image=postgres:alpine --labels="tier=database" \
   --env="POSTGRES_PASSWORD=secret"
 
 # Create services
@@ -500,10 +506,15 @@ kubectl expose pod frontend --port=80
 kubectl expose pod backend --port=80
 kubectl expose pod database --port=5432
 
+# Wait for pods
+kubectl wait --for=condition=ready pod frontend --timeout=60s
+kubectl wait --for=condition=ready pod backend --timeout=60s
+kubectl wait --for=condition=ready pod database --timeout=60s
+
 # Test connectivity (should all work)
-kubectl exec frontend -- wget -qO- --timeout=2 backend
+kubectl exec frontend -- wget -qO- --timeout=2 http://backend
 kubectl exec frontend -- nc -zv database 5432
-kubectl exec backend -- nc -zv database 5432
+kubectl exec backend -- curl -m 2 database:5432 || echo "Connection test (expected to fail on app level)"
 
 # Apply network policies
 cat <<EOF | kubectl apply -f -
@@ -528,8 +539,8 @@ spec:
 EOF
 
 # Test again
-kubectl exec frontend -- nc -zv database 5432  # Should FAIL
-kubectl exec backend -- nc -zv database 5432   # Should WORK
+kubectl exec frontend -- nc -zv database 5432  # Should FAIL (timeout)
+kubectl exec backend -- nc -zv database 5432   # Should WORK (connection succeeds)
 ```
 
 ### Exercise 2: Namespace Isolation
@@ -543,9 +554,21 @@ kubectl create namespace dev
 kubectl label namespace prod environment=production
 kubectl label namespace dev environment=development
 
-# Create pods in both namespaces
-kubectl run app --image=nginx -n prod
-kubectl run app --image=nginx -n dev
+# Create pods in both namespaces (busybox for testing)
+kubectl run app --image=busybox -n prod -- sleep 3600
+kubectl run app --image=busybox -n dev -- sleep 3600
+
+# Create services
+kubectl expose pod app --port=80 -n prod
+kubectl expose pod app --port=80 -n dev
+
+# Wait for pods
+kubectl wait --for=condition=ready pod app -n prod --timeout=60s
+kubectl wait --for=condition=ready pod app -n dev --timeout=60s
+
+# Test before policy (both should work)
+kubectl exec -n dev app -- nc -zv app.prod 80
+kubectl exec -n prod app -- nc -zv app.prod 80
 
 # Apply isolation
 cat <<EOF | kubectl apply -f -
@@ -565,9 +588,9 @@ spec:
           environment: production
 EOF
 
-# Test
-kubectl exec -n dev app -- wget -qO- --timeout=2 app.prod  # FAIL
-kubectl exec -n prod app -- wget -qO- --timeout=2 app.prod # WORK
+# Test after policy
+kubectl exec -n dev app -- nc -zv app.prod 80 # FAIL (timeout)
+kubectl exec -n prod app -- nc -zv app.prod 80 # WORK (connection succeeds)
 ```
 
 ## Troubleshooting
@@ -610,14 +633,46 @@ EOF
 
 ### Issue 3: Can't Test Connectivity
 
-```bash
-# Install network tools in pod
-kubectl run test --image=nicolaka/netshoot -it --rm
+**Important: Choose the right image for testing!**
 
-# Test connectivity
+```bash
+# Option 1: busybox (has wget and nc)
+kubectl run test --image=busybox -it --rm -- sh
+# Inside pod:
+wget -qO- --timeout=2 http://backend
+nc -zv backend 80
+
+# Option 2: nicolaka/netshoot (has all network tools)
+kubectl run test --image=nicolaka/netshoot -it --rm -- sh
+# Inside pod:
 wget -qO- --timeout=2 http://backend
 nc -zv backend 80
 nslookup backend
+curl backend
+
+# Option 3: alpine (has wget)
+kubectl run test --image=alpine -it --rm -- sh
+# Inside pod:
+wget -qO- --timeout=2 http://backend
+
+# ❌ DON'T use nginx for testing - it doesn't have wget/curl/nc
+```
+
+**Testing from existing pods:**
+
+```bash
+# If pod is nginx (no wget):
+kubectl exec nginx-pod -- curl backend  # nginx has curl
+kubectl exec nginx-pod -- nc -zv backend 80  # nginx might not have nc
+
+# If pod is busybox:
+kubectl exec busybox-pod -- wget -qO- --timeout=2 http://backend
+kubectl exec busybox-pod -- nc -zv backend 80
+
+# Best practice: Create a dedicated test pod
+kubectl run nettest --image=busybox -- sleep 3600
+kubectl exec nettest -- wget -qO- --timeout=2 http://backend
+kubectl exec nettest -- nc -zv backend 80
 ```
 
 ### Debugging Commands
@@ -629,12 +684,25 @@ kubectl get networkpolicy -A
 # Describe policy
 kubectl describe networkpolicy <n>
 
-# Check pod connectivity
-kubectl exec <pod> -- wget -qO- --timeout=2 <target>
-kubectl exec <pod> -- nc -zv <target> <port>
+# Check pod connectivity (use busybox or alpine)
+kubectl run nettest --image=busybox -- sleep 3600
+kubectl exec nettest -- wget -qO- --timeout=2 http://<target>
+kubectl exec nettest -- nc -zv <target> <port>
+
+# Or use nicolaka/netshoot for full toolset
+kubectl run nettest --image=nicolaka/netshoot -- sleep 3600
+kubectl exec nettest -- curl <target>
+kubectl exec nettest -- nslookup <target>
+kubectl exec nettest -- telnet <target> <port>
 
 # View policy YAML
 kubectl get networkpolicy <n> -o yaml
+
+# Check pod labels
+kubectl get pods --show-labels
+
+# Verify namespace labels
+kubectl get namespaces --show-labels
 ```
 
 ## Exam Tips
@@ -808,9 +876,26 @@ kubectl describe networkpolicy <n>
 # Delete
 kubectl delete networkpolicy <n>
 
-# Test connectivity
-kubectl exec <pod> -- wget -qO- <target>
-kubectl exec <pod> -- nc -zv <target> <port>
+# Test connectivity (use appropriate image)
+kubectl run nettest --image=busybox -- sleep 3600
+kubectl exec nettest -- wget -qO- --timeout=2 http://<target>
+kubectl exec nettest -- nc -zv <target> <port>
+```
+
+### Image Reference for Testing
+
+| Image | wget | curl | nc | nslookup | telnet | Best For |
+|-------|------|------|----|---------| -------|----------|
+| **busybox** | ✅ | ❌ | ✅ | ✅ | ✅ | Quick tests, exam |
+| **alpine** | ✅ | ❌ | ✅ | ❌ | ❌ | Lightweight testing |
+| **nginx** | ❌ | ✅ | ❌ | ❌ | ❌ | Web server (not for testing) |
+| **nicolaka/netshoot** | ✅ | ✅ | ✅ | ✅ | ✅ | Full network debugging |
+| **curlimages/curl** | ❌ | ✅ | ❌ | ❌ | ❌ | curl-only testing |
+
+**Recommendation for CKA exam:**
+- Use `busybox` - it has wget, nc, and nslookup
+- Command: `kubectl run test --image=busybox -- sleep 3600`
+
 ```
 
 ---
