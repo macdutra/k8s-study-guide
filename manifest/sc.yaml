@@ -1,0 +1,6 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+provisioner: k8s.io/minikube-hostpath # indicates that this StorageClass does not support automatic provisioning
+volumeBindingMode: WaitForFirstConsumer
