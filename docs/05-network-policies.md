@@ -513,6 +513,29 @@ EOF
 
 ## Hands-On Practice
 
+### Understanding Pod Roles in NetworkPolicy Testing
+
+**Important:** For NetworkPolicy testing, you need:
+- **Server pods** (nginx, postgres) - Run actual services that listen on ports
+- **Client pods** (busybox, nginx) - Have testing tools to test connections
+
+| Pod | Image | Has Server? | Has Testing Tools? | Can Be Server? | Can Be Client? |
+|-----|-------|-------------|-------------------|----------------|----------------|
+| frontend | busybox | ❌ No | ✅ nc, wget | ❌ No | ✅ Yes |
+| backend | nginx | ✅ Port 80 | ✅ curl | ✅ Yes | ✅ Yes |
+| database | postgres | ✅ Port 5432 | ❌ None | ✅ Yes | ❌ No |
+
+**Why nginx is great for both roles:**
+- ✅ Has web server on port 80 (server role)
+- ✅ Has curl built-in (client role)
+- ✅ Use same image for both - simpler!
+- ✅ Realistic microservice-to-microservice testing
+
+**Why this matters:**
+- busybox does NOT run a web server - it just runs `sleep`
+- Exposing busybox on port 80 creates a service pointing to nothing
+- nginx can be BOTH server (receives) and client (sends) connections
+
 ### Exercise 1: Three-Tier App Security
 
 Setup a 3-tier app with proper network isolation.
@@ -561,12 +584,23 @@ spec:
       port: 5432
 EOF
 
-# Test again
-kubectl exec frontend -- nc -zv database 5432  # Should FAIL (timeout)
-kubectl exec backend -- nc -zv database 5432   # Should WORK (connection succeeds)
+# Test again (after NetworkPolicy applied)
+kubectl exec frontend -- timeout 5 nc -zv database 5432  # Should FAIL (timeout) - frontend blocked
+kubectl exec backend -- timeout 5 sh -c "curl -m 2 database:5432 && echo 'Connected'" || echo "Backend blocked or postgres rejected"  # Should succeed at TCP level
+
+# Better test: Use a dedicated test pod
+kubectl run nettest --image=busybox --labels="tier=test" -- sleep 3600
+kubectl wait --for=condition=ready pod nettest --timeout=60s
+
+# Test with nettest pod
+kubectl exec nettest -- nc -zv database 5432  # Should FAIL (nettest tier blocked)
+kubectl exec frontend -- nc -zv database 5432 # Should FAIL (frontend tier blocked)
+# Note: backend can connect (allowed by policy) but postgres will reject the connection at app level
 ```
 
 ### Exercise 2: Namespace Isolation
+
+**Setup:** Use nginx for both pods. nginx has a web server (port 80) AND curl for testing.
 
 ```bash
 # Create namespaces
@@ -577,21 +611,27 @@ kubectl create namespace dev
 kubectl label namespace prod environment=production
 kubectl label namespace dev environment=development
 
-# Create pods in both namespaces (busybox for testing)
-kubectl run app --image=busybox -n prod -- sleep 3600
-kubectl run app --image=busybox -n dev -- sleep 3600
+# Create pods with nginx in both namespaces
+kubectl run app --image=nginx -n dev
+kubectl run app --image=nginx -n prod
 
-# Create services
+# Create service (points to nginx server in prod)
 kubectl expose pod app --port=80 -n prod
-kubectl expose pod app --port=80 -n dev
 
 # Wait for pods
 kubectl wait --for=condition=ready pod app -n prod --timeout=60s
 kubectl wait --for=condition=ready pod app -n dev --timeout=60s
 
-# Test before policy (both should work)
-kubectl exec -n dev app -- nc -zv app.prod 80
-kubectl exec -n prod app -- nc -zv app.prod 80
+# Wait for DNS to propagate
+sleep 15
+
+# Test before policy (both should work - use curl from nginx)
+echo "=== Before NetworkPolicy ==="
+echo "dev → prod (should work):"
+kubectl exec -n dev app -- curl -m 2 http://app.prod.svc.cluster.local | head -3
+
+echo "prod → prod (should work):"
+kubectl exec -n prod app -- curl -m 2 http://app.prod.svc.cluster.local | head -3
 
 # Apply isolation
 cat <<EOF | kubectl apply -f -
@@ -609,6 +649,28 @@ spec:
     - namespaceSelector:
         matchLabels:
           environment: production
+EOF
+
+# Wait for policy to apply
+sleep 15
+
+# Test after policy
+echo ""
+echo "=== After NetworkPolicy ==="
+echo "dev → prod (should be BLOCKED):"
+kubectl exec -n dev app -- timeout 5 curl -m 2 http://app.prod.svc.cluster.local 2>&1 || echo "✅ Connection blocked by NetworkPolicy!"
+
+echo "prod → prod (should WORK):"
+kubectl exec -n prod app -- curl -m 2 http://app.prod.svc.cluster.local | head -3 && echo "✅ Connection allowed!"
+```
+
+**Why nginx for both?**
+- ✅ nginx has a web server on port 80 (can receive connections)
+- ✅ nginx has curl built-in (can test connections)
+- ✅ Simpler - same image for client and server
+- ✅ More realistic - testing microservice-to-microservice communication
+
+**DNS Note:** Use full DNS name `app.prod.svc.cluster.local` if short name `app.prod` doesn't resolve.
 EOF
 
 # Test after policy
@@ -700,17 +762,65 @@ kubectl run <pod-name> --image=<image> -n <namespace>
 sleep 15
 ```
 
-### Issue 3: DNS Not Working
+### Issue 3: DNS Not Working / Can't Resolve Service
+
+**Problem:** Cross-namespace DNS like `app.prod` doesn't resolve.
+
+**Solution 1: Use Full DNS Name (FQDN)**
 
 ```bash
-# Always allow DNS egress
+# ❌ Short name might not work:
+kubectl exec -n dev app -- nc -zv app.prod 80
+
+# ✅ Use full DNS name:
+kubectl exec -n dev app -- nc -zv app.prod.svc.cluster.local 80
+
+# Kubernetes DNS format:
+# <service-name>.<namespace>.svc.cluster.local
+```
+
+**Solution 2: Verify Service Exists**
+
+```bash
+# Check if service exists in target namespace
+kubectl get svc -n prod
+
+# If service doesn't exist, create it
+kubectl expose pod app --port=80 -n prod
+
+# Wait for DNS to propagate
+sleep 15
+```
+
+**Solution 3: Check CoreDNS**
+
+```bash
+# Check CoreDNS is running
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+
+# Test basic DNS (should work)
+kubectl exec -n dev app -- nslookup kubernetes
+
+# Restart CoreDNS if needed
+kubectl rollout restart deployment coredns -n kube-system
+kubectl wait --for=condition=ready pod -l k8s-app=kube-dns -n kube-system --timeout=120s
+sleep 15
+```
+
+**Solution 4: Add DNS Egress Rule**
+
+```bash
+# If you have strict egress policies, allow DNS
 cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-dns
+  namespace: dev
 spec:
   podSelector: {}
+  policyTypes:
+  - Egress
   egress:
   - to:
     - namespaceSelector: {}
@@ -720,7 +830,37 @@ spec:
 EOF
 ```
 
-### Issue 3: Can't Test Connectivity
+### Issue 4: Connection Fails Even Without NetworkPolicy
+
+**Problem:** `nc` or `wget` fails but no NetworkPolicy is applied.
+
+**Root Cause:** Server pod (like busybox) has NO service listening on the port.
+
+**Solution:**
+
+```bash
+# ❌ WRONG - busybox has no web server:
+kubectl run app --image=busybox -n prod -- sleep 3600
+kubectl expose pod app --port=80 -n prod
+kubectl exec -n dev client -- nc -zv app.prod.svc.cluster.local 80
+# Fails: Connection refused (nothing listening on port 80)
+
+# ✅ CORRECT - Use nginx (has web server on port 80):
+kubectl delete pod app -n prod
+kubectl run app --image=nginx -n prod
+kubectl expose pod app --port=80 -n prod
+kubectl wait --for=condition=ready pod app -n prod --timeout=60s
+sleep 10
+kubectl exec -n dev client -- nc -zv app.prod.svc.cluster.local 80
+# Works: app.prod.svc.cluster.local (10.x.x.x:80) open ✅
+```
+
+**Pod Role Summary:**
+- **Server** (receives connections): nginx, httpd, postgres - must have listening service
+- **Client** (tests connections): busybox, alpine - needs nc/wget tools
+- **Don't use busybox as server** - it has no listening service!
+
+### Issue 5: Can't Test Connectivity
 
 **Important: Choose the right image for testing!**
 
@@ -973,17 +1113,42 @@ kubectl exec nettest -- nc -zv <target> <port>
 
 ### Image Reference for Testing
 
-| Image | wget | curl | nc | nslookup | telnet | Best For |
-|-------|------|------|----|---------| -------|----------|
-| **busybox** | ✅ | ❌ | ✅ | ✅ | ✅ | Quick tests, exam |
-| **alpine** | ✅ | ❌ | ✅ | ❌ | ❌ | Lightweight testing |
-| **nginx** | ❌ | ✅ | ❌ | ❌ | ❌ | Web server (not for testing) |
-| **nicolaka/netshoot** | ✅ | ✅ | ✅ | ✅ | ✅ | Full network debugging |
-| **curlimages/curl** | ❌ | ✅ | ❌ | ❌ | ❌ | curl-only testing |
+| Image | Has Server? | wget | curl | nc | Best For |
+|-------|-------------|------|------|----|----------|
+| **nginx** | ✅ Port 80 | ❌ | ✅ | ❌ | **Server AND client** ⭐ |
+| **busybox** | ❌ None | ✅ | ❌ | ✅ | Client testing only |
+| **postgres** | ✅ Port 5432 | ❌ | ❌ | ❌ | Database server only |
+| **nicolaka/netshoot** | ❌ None | ✅ | ✅ | ✅ | Advanced debugging |
 
-**Recommendation for CKA exam:**
-- Use `busybox` - it has wget, nc, and nslookup
-- Command: `kubectl run test --image=busybox -- sleep 3600`
+**Testing Examples:**
+
+```bash
+# Using nginx for BOTH client and server (recommended!)
+kubectl run server --image=nginx -n prod
+kubectl run client --image=nginx -n dev
+kubectl expose pod server --port=80 -n prod
+
+# Test from client (use curl)
+kubectl exec -n dev client -- curl -m 2 http://server.prod.svc.cluster.local
+
+# Test from server (nginx can test itself)
+kubectl exec -n prod server -- curl -m 2 http://server.prod.svc.cluster.local
+
+# Or use busybox for client (has nc and wget)
+kubectl run client --image=busybox -n dev -- sleep 3600
+kubectl exec -n dev client -- nc -zv server.prod.svc.cluster.local 80
+kubectl exec -n dev client -- wget -qO- --timeout=2 http://server.prod.svc.cluster.local
+```
+
+**Recommendation for NetworkPolicy testing:**
+- ✅ **Use nginx for both client and server** - simpler, has web server + curl
+- ✅ Or use busybox for client (has nc, wget) + nginx for server
+- ❌ Don't use busybox as server - it has no listening service!
+
+**For CKA exam:**
+- nginx is perfect - can be both server and client
+- Command: `kubectl run test --image=nginx`
+- Test with: `kubectl exec test -- curl -m 2 http://target`
 
 ```
 

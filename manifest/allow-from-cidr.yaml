@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-cidr
+spec:
+  podSelector:
+    matchLabels:
+      app: public-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 192.168.1.0/24
+        except:
+        - 192.168.1.5/32
+    ports:
+    - protocol: TCP
+      port: 443
