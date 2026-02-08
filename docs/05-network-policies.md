@@ -33,14 +33,37 @@ NetworkPolicy allows you to control traffic flow at the IP address or port level
 
 ## Prerequisites
 
-### Verify Network Plugin Supports NetworkPolicy
+### ⚠️ CRITICAL: Minikube Requires Calico CNI
+
+**The default Minikube CNI (kindnet) does NOT enforce NetworkPolicy!**
+
+You MUST start Minikube with Calico for NetworkPolicy to work:
 
 ```bash
-# In minikube, the default CNI supports NetworkPolicy
-minikube ssh "cat /etc/cni/net.d/*" | grep -i network
+# If you have an existing Minikube cluster, delete it first
+minikube delete
 
-# Most CNIs support it: Calico, Cilium, Weave, Flannel (with modifications)
+# Start Minikube with Calico CNI
+minikube start --cni=calico --memory=4096 --cpus=2
+
+# Wait for Calico to be ready (takes 2-3 minutes)
+echo "Waiting for Calico to be ready..."
+kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n kube-system --timeout=300s
+kubectl wait --for=condition=ready pod -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
+
+# Verify Calico is running
+kubectl get pods -n kube-system | grep calico
+# Should show:
+# calico-kube-controllers-xxx   1/1     Running
+# calico-node-xxx               1/1     Running
 ```
+
+**Why this is required:**
+- ✅ Calico enforces NetworkPolicy rules
+- ❌ Default kindnet CNI ignores NetworkPolicy
+- ⚠️ Installing Calico afterward causes conflicts
+
+**For CKA Exam:** The exam cluster already has a CNI that supports NetworkPolicy, so you won't need to install anything.
 
 ### Create Test Environment
 
@@ -595,23 +618,89 @@ kubectl exec -n prod app -- nc -zv app.prod 80 # WORK (connection succeeds)
 
 ## Troubleshooting
 
-### Issue 1: Policy Not Working
+### Issue 1: NetworkPolicy Not Blocking Traffic (Most Common!)
+
+**Problem:** You created a NetworkPolicy but traffic is still allowed.
+
+**Root Cause:** Minikube's default CNI (kindnet) does NOT enforce NetworkPolicy.
+
+**Solution:**
 
 ```bash
-# Check if NetworkPolicy was created
-kubectl get networkpolicy
+# Check if you're using Calico
+kubectl get pods -n kube-system | grep calico
 
-# Describe policy
-kubectl describe networkpolicy <policy-name>
+# If no Calico pods appear:
+# You MUST restart Minikube with Calico
 
-# Check pod labels match
-kubectl get pods --show-labels
+# Step 1: Delete current Minikube
+minikube delete
 
-# Verify CNI supports NetworkPolicy
-kubectl get pods -n kube-system
+# Step 2: Start with Calico CNI
+minikube start --cni=calico --memory=4096 --cpus=2
+
+# Step 3: Wait for Calico (2-3 minutes)
+kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n kube-system --timeout=300s
+
+# Step 4: Verify Calico is running
+kubectl get pods -n kube-system | grep calico
+# Should show calico-node and calico-kube-controllers Running
+
+# Now NetworkPolicy will work!
 ```
 
-### Issue 2: DNS Not Working
+**Quick Test to Verify NetworkPolicy Works:**
+
+```bash
+# Create test
+kubectl create namespace test
+kubectl run pod1 --image=busybox -n test -- sleep 3600
+kubectl run pod2 --image=nginx -n test
+kubectl expose pod pod2 --port=80 -n test
+kubectl wait --for=condition=ready pod -n test --all --timeout=60s
+sleep 15
+
+# Test before policy (should work)
+kubectl exec -n test pod1 -- wget -qO- --timeout=2 http://pod2
+
+# Apply deny-all
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: test
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+EOF
+
+sleep 15
+
+# Test after policy (should timeout)
+kubectl exec -n test pod1 -- timeout 5 wget -qO- http://pod2
+
+# If it times out: ✅ NetworkPolicy works!
+# If it succeeds: ❌ CNI doesn't support NetworkPolicy
+```
+
+### Issue 2: Policy Not Working Even with Calico
+
+```bash
+# Pods might have been created before Calico was ready
+# Solution: Recreate the pods
+
+kubectl delete pod -n <namespace> --all
+
+# Recreate pods
+kubectl run <pod-name> --image=<image> -n <namespace>
+
+# Wait for Calico to configure them
+sleep 15
+```
+
+### Issue 3: DNS Not Working
 
 ```bash
 # Always allow DNS egress
