@@ -1177,8 +1177,6 @@ kubectl exec -n dev client -- wget -qO- --timeout=2 http://server.prod.svc.clust
 - Command: `kubectl run test --image=nginx`
 - Test with: `kubectl exec test -- curl -m 2 http://target`
 
-```
-
 ---
 
 **Back to**: [Main README](../README.md) | [Previous: Storage](04-storage-management.md) | [Next: Sidecar Patterns](06-sidecar-patterns.md)
