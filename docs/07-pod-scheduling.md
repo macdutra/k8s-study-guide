@@ -187,4 +187,6 @@ kubectl get nodes --show-labels
 kubectl describe node <node> | grep Taints
 ```
 
-**Back to**: [Main README](../README.md)
+---
+
+**Back to**: [Main README](../README.md) | [Previous: Sidecar Patterns](06-sidecar-patterns.md) | [Next: Gateway API](08-gateway-api.md)

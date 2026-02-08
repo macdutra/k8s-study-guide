@@ -842,4 +842,4 @@ kubectl describe pod <pod>
 
 ---
 
-**Back to**: [Main README](../README.md) | [Next: RBAC](10-rbac.md)
+**Back to**: [Main README](../README.md) | [Previous: Network Policies](05-network-policies.md) | [Next: Pod Scheduling](07-pod-scheduling.md)

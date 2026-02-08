@@ -577,4 +577,4 @@ kubectl auth can-i <verb> <resource> --as=<user/sa>
 
 ---
 
-**Back to**: [Main README](../README.md) | [Next: Troubleshooting](11-cluster-troubleshooting.md)
+**Back to**: [Main README](../README.md) | [Previous: ETCD Backup & Restore](09-etcd-backup-restore.md) | [Next: Cluster Troubleshooting](11-cluster-troubleshooting.md)

@@ -653,4 +653,6 @@ kubectl describe pod -n kube-system etcd-controlplane
 
 **This is a guaranteed exam question. Practice until you can do it in your sleep!**
 
-**Back to**: [Main README](../README.md) | [Next: RBAC](10-rbac.md)
+---
+
+**Back to**: [Main README](../README.md) | [Previous: Pod Scheduling](07-pod-scheduling.md) | [Next: RBAC](10-rbac.md)

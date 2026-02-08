@@ -136,6 +136,7 @@ kubectl get nodes
 - [Network Policies](docs/05-network-policies.md)
 - [Sidecar Patterns](docs/06-sidecar-patterns.md)
 - [Pod Scheduling](docs/07-pod-scheduling.md)
+- [Gateway API](docs/08-gateway-api.md)
 - [ETCD Backup & Restore](docs/09-etcd-backup-restore.md)
 - [RBAC](docs/10-rbac.md)
 - [Cluster Troubleshooting](docs/11-cluster-troubleshooting.md)
@@ -152,7 +153,9 @@ kubectl get nodes
 | 7 | Final Review | Complete practice exam | 4 hours |
 
 **Resources**:
-- All topics from Weeks 1-2
+- [Helm Basics](docs/12-helm-basics.md)
+- [ConfigMap & Secrets](docs/13-configmap-secrets.md)
+- [kubectl Tips & Tricks](docs/14-kubectl-tips.md)
 - [Practice Exercises](examples/)
 - Review all core documentation
 
@@ -168,9 +171,13 @@ kubectl get nodes
 6. **[Network Policies](docs/05-network-policies.md)** - Pod-to-pod communication control
 7. **[Sidecar Patterns](docs/06-sidecar-patterns.md)** - Multi-container pod patterns
 8. **[Pod Scheduling](docs/07-pod-scheduling.md)** - Node affinity, taints, tolerations
-9. **[ETCD Backup & Restore](docs/09-etcd-backup-restore.md)** - Control plane backup and recovery
-10. **[RBAC](docs/10-rbac.md)** - Role-Based Access Control
-11. **[Cluster Troubleshooting](docs/11-cluster-troubleshooting.md)** - Debugging cluster issues
+9. **[Gateway API](docs/08-gateway-api.md)** - Modern ingress alternative
+10. **[ETCD Backup & Restore](docs/09-etcd-backup-restore.md)** - Control plane backup and recovery
+11. **[RBAC](docs/10-rbac.md)** - Role-Based Access Control
+12. **[Cluster Troubleshooting](docs/11-cluster-troubleshooting.md)** - Debugging cluster issues
+13. **[Helm Basics](docs/12-helm-basics.md)** - Kubernetes package manager
+14. **[ConfigMap & Secrets](docs/13-configmap-secrets.md)** - Configuration management
+15. **[kubectl Tips & Tricks](docs/14-kubectl-tips.md)** - Exam efficiency guide
 
 ### Quick References
 

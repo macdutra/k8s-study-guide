@@ -697,4 +697,6 @@ kubectl get events --sort-by='.lastTimestamp'
 
 **Troubleshooting is 30% of the exam. Practice these scenarios until they're second nature!**
 
-**Back to**: [Main README](../README.md)
+---
+
+**Back to**: [Main README](../README.md) | [Previous: RBAC](10-rbac.md) | [Next: Helm Basics](12-helm-basics.md)
