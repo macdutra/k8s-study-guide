@@ -515,34 +515,33 @@ EOF
 
 ### Understanding Pod Roles in NetworkPolicy Testing
 
-**Important:** For NetworkPolicy testing, you need:
-- **Server pods** (nginx, postgres) - Run actual services that listen on ports
-- **Client pods** (busybox, nginx) - Have testing tools to test connections
+**Important:** For NetworkPolicy testing, use nginx for web tier pods (frontend, backend) and postgres for database tier.
 
 | Pod | Image | Has Server? | Has Testing Tools? | Can Be Server? | Can Be Client? |
 |-----|-------|-------------|-------------------|----------------|----------------|
-| frontend | busybox | ❌ No | ✅ nc, wget | ❌ No | ✅ Yes |
-| backend | nginx | ✅ Port 80 | ✅ curl | ✅ Yes | ✅ Yes |
-| database | postgres | ✅ Port 5432 | ❌ None | ✅ Yes | ❌ No |
+| **frontend** | nginx | ✅ Port 80 | ✅ curl | ✅ Yes | ✅ Yes |
+| **backend** | nginx | ✅ Port 80 | ✅ curl | ✅ Yes | ✅ Yes |
+| **database** | postgres | ✅ Port 5432 | ❌ None | ✅ Yes | ❌ No |
 
-**Why nginx is great for both roles:**
-- ✅ Has web server on port 80 (server role)
-- ✅ Has curl built-in (client role)
-- ✅ Use same image for both - simpler!
+**Why nginx for frontend and backend?**
+- ✅ Both have web servers on port 80 (server role)
+- ✅ Both have curl built-in (client role)
+- ✅ Simpler - same image for web tier
 - ✅ Realistic microservice-to-microservice testing
+- ✅ No need for sleep command - nginx runs automatically
 
-**Why this matters:**
-- busybox does NOT run a web server - it just runs `sleep`
-- Exposing busybox on port 80 creates a service pointing to nothing
-- nginx can be BOTH server (receives) and client (sends) connections
+**Why NOT busybox for frontend?**
+- ❌ busybox has no web server (just runs `sleep`)
+- ❌ Exposing busybox on port 80 creates service pointing to nothing
+- ❌ Can't test if NetworkPolicy blocks vs. no server running
 
 ### Exercise 1: Three-Tier App Security
 
 Setup a 3-tier app with proper network isolation.
 
 ```bash
-# Create pods
-kubectl run frontend --image=busybox --labels="tier=frontend" -- sleep 3600
+# Create pods - all using nginx for frontend and backend (simpler!)
+kubectl run frontend --image=nginx --labels="tier=frontend"
 kubectl run backend --image=nginx --labels="tier=backend"
 kubectl run database --image=postgres:alpine --labels="tier=database" \
   --env="POSTGRES_PASSWORD=secret"
@@ -557,10 +556,14 @@ kubectl wait --for=condition=ready pod frontend --timeout=60s
 kubectl wait --for=condition=ready pod backend --timeout=60s
 kubectl wait --for=condition=ready pod database --timeout=60s
 
-# Test connectivity (should all work)
-kubectl exec frontend -- wget -qO- --timeout=2 http://backend
-kubectl exec frontend -- nc -zv database 5432
-kubectl exec backend -- curl -m 2 database:5432 || echo "Connection test (expected to fail on app level)"
+# Wait for services to be ready
+sleep 10
+
+# Test connectivity (should all work - use curl from nginx)
+echo "=== Testing connectivity BEFORE NetworkPolicy ==="
+kubectl exec frontend -- curl -m 2 http://backend | head -3
+kubectl exec frontend -- curl -m 2 database:5432 || echo "(postgres connection test)"
+kubectl exec backend -- curl -m 2 database:5432 || echo "(postgres connection test)"
 
 # Apply network policies
 cat <<EOF | kubectl apply -f -
@@ -584,19 +587,28 @@ spec:
       port: 5432
 EOF
 
+# Wait for policy to apply
+sleep 15
+
 # Test again (after NetworkPolicy applied)
-kubectl exec frontend -- timeout 5 nc -zv database 5432  # Should FAIL (timeout) - frontend blocked
-kubectl exec backend -- timeout 5 sh -c "curl -m 2 database:5432 && echo 'Connected'" || echo "Backend blocked or postgres rejected"  # Should succeed at TCP level
+echo ""
+echo "=== Testing AFTER NetworkPolicy ==="
+echo "frontend → database (should FAIL - frontend blocked):"
+kubectl exec frontend -- timeout 5 curl -m 2 database:5432 2>&1 || echo "✅ BLOCKED by NetworkPolicy!"
 
-# Better test: Use a dedicated test pod
-kubectl run nettest --image=busybox --labels="tier=test" -- sleep 3600
-kubectl wait --for=condition=ready pod nettest --timeout=60s
+echo "backend → database (should WORK - backend allowed):"
+kubectl exec backend -- timeout 5 curl -m 2 database:5432 2>&1 || echo "(Connection works at TCP level, postgres rejects at app level)"
 
-# Test with nettest pod
-kubectl exec nettest -- nc -zv database 5432  # Should FAIL (nettest tier blocked)
-kubectl exec frontend -- nc -zv database 5432 # Should FAIL (frontend tier blocked)
-# Note: backend can connect (allowed by policy) but postgres will reject the connection at app level
+echo "frontend → backend (should WORK - no policy blocking this):"
+kubectl exec frontend -- curl -m 2 http://backend | head -3
 ```
+
+**Why use nginx for frontend and backend?**
+- ✅ Both have web servers on port 80 (can receive connections)
+- ✅ Both have curl built-in (can test connections)
+- ✅ Simpler - same image, consistent setup
+- ✅ Realistic - microservice-to-microservice communication
+
 
 ### Exercise 2: Namespace Isolation
 
