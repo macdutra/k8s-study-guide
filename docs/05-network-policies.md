@@ -627,8 +627,9 @@ kubectl label namespace dev environment=development
 kubectl run app --image=nginx -n dev
 kubectl run app --image=nginx -n prod
 
-# Create service (points to nginx server in prod)
+# Create services in BOTH namespaces
 kubectl expose pod app --port=80 -n prod
+kubectl expose pod app --port=80 -n dev
 
 # Wait for pods
 kubectl wait --for=condition=ready pod app -n prod --timeout=60s
@@ -644,6 +645,9 @@ kubectl exec -n dev app -- curl -m 2 http://app.prod.svc.cluster.local | head -3
 
 echo "prod → prod (should work):"
 kubectl exec -n prod app -- curl -m 2 http://app.prod.svc.cluster.local | head -3
+
+echo "dev → dev (should work):"
+kubectl exec -n dev app -- curl -m 2 http://app.dev.svc.cluster.local | head -3
 
 # Apply isolation
 cat <<EOF | kubectl apply -f -
@@ -669,12 +673,29 @@ sleep 15
 # Test after policy
 echo ""
 echo "=== After NetworkPolicy ==="
-echo "dev → prod (should be BLOCKED):"
-kubectl exec -n dev app -- timeout 5 curl -m 2 http://app.prod.svc.cluster.local 2>&1 || echo "✅ Connection blocked by NetworkPolicy!"
+echo "dev → prod (should be BLOCKED - dev namespace not allowed):"
+kubectl exec -n dev app -- timeout 5 curl -m 2 http://app.prod.svc.cluster.local 2>&1 || echo "✅ BLOCKED by NetworkPolicy!"
 
-echo "prod → prod (should WORK):"
+echo ""
+echo "prod → prod (should WORK - same namespace allowed):"
 kubectl exec -n prod app -- curl -m 2 http://app.prod.svc.cluster.local | head -3 && echo "✅ Connection allowed!"
+
+echo ""
+echo "dev → dev (should WORK - no policy blocking dev namespace):"
+kubectl exec -n dev app -- curl -m 2 http://app.dev.svc.cluster.local | head -3 && echo "✅ Connection allowed!"
+
+echo ""
+echo "prod → dev (should WORK - no policy blocking dev namespace):"
+kubectl exec -n prod app -- curl -m 2 http://app.dev.svc.cluster.local | head -3 && echo "✅ Connection allowed!"
 ```
+
+**Summary of NetworkPolicy behavior:**
+- ✅ prod → prod: **ALLOWED** (same namespace)
+- ❌ dev → prod: **BLOCKED** (NetworkPolicy blocks non-production namespaces)
+- ✅ dev → dev: **ALLOWED** (no policy on dev namespace)
+- ✅ prod → dev: **ALLOWED** (no policy on dev namespace)
+
+**Key insight:** NetworkPolicy in prod namespace only controls **incoming traffic to prod**, not outgoing traffic from prod!
 
 **Why nginx for both?**
 - ✅ nginx has a web server on port 80 (can receive connections)
@@ -683,12 +704,6 @@ kubectl exec -n prod app -- curl -m 2 http://app.prod.svc.cluster.local | head -
 - ✅ More realistic - testing microservice-to-microservice communication
 
 **DNS Note:** Use full DNS name `app.prod.svc.cluster.local` if short name `app.prod` doesn't resolve.
-EOF
-
-# Test after policy
-kubectl exec -n dev app -- nc -zv app.prod 80 # FAIL (timeout)
-kubectl exec -n prod app -- nc -zv app.prod 80 # WORK (connection succeeds)
-```
 
 ## Troubleshooting
 
