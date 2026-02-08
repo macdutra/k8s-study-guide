@@ -135,10 +135,10 @@ kubectl get nodes
 **Resources**:
 - [Network Policies](docs/05-network-policies.md)
 - [Sidecar Patterns](docs/06-sidecar-patterns.md)
-- [Priority Scheduling](docs/07-priority-class.md)
-- [Gateway API](docs/08-gateway-api.md)
-- [ETCD Troubleshooting](docs/09-etcd-troubleshooting.md)
-- [CRD Management](docs/10-crd-management.md)
+- [Pod Scheduling](docs/07-pod-scheduling.md)
+- [ETCD Backup & Restore](docs/09-etcd-backup-restore.md)
+- [RBAC](docs/10-rbac.md)
+- [Cluster Troubleshooting](docs/11-cluster-troubleshooting.md)
 
 ### 🔴 Week 3: Integration & Mastery
 
@@ -152,10 +152,9 @@ kubectl get nodes
 | 7 | Final Review | Complete practice exam | 4 hours |
 
 **Resources**:
-- [Helm Guide](docs/11-helm-package-management.md)
-- [ArgoCD Tutorial](docs/12-argocd-gitops.md)
-- [ConfigMap Advanced](docs/13-configmap-immutable.md)
-- [Linux Networking](docs/14-linux-networking.md)
+- All topics from Weeks 1-2
+- [Practice Exercises](examples/)
+- Review all core documentation
 
 ## 📚 Documentation
 
@@ -168,14 +167,10 @@ kubectl get nodes
 5. **[Storage Management](docs/04-storage-management.md)** - PV, PVC, StorageClass
 6. **[Network Policies](docs/05-network-policies.md)** - Pod-to-pod communication control
 7. **[Sidecar Patterns](docs/06-sidecar-patterns.md)** - Multi-container pod patterns
-8. **[Priority Classes](docs/07-priority-class.md)** - Pod scheduling priority
-9. **[Gateway API](docs/08-gateway-api.md)** - Modern ingress alternative
-10. **[ETCD Troubleshooting](docs/09-etcd-troubleshooting.md)** - Control plane debugging
-11. **[CRD Management](docs/10-crd-management.md)** - Custom Resource Definitions
-12. **[Helm](docs/11-helm-package-management.md)** - Package management
-13. **[ArgoCD](docs/12-argocd-gitops.md)** - GitOps continuous delivery
-14. **[Immutable ConfigMaps](docs/13-configmap-immutable.md)** - Configuration management
-15. **[Linux Networking](docs/14-linux-networking.md)** - System administration
+8. **[Pod Scheduling](docs/07-pod-scheduling.md)** - Node affinity, taints, tolerations
+9. **[ETCD Backup & Restore](docs/09-etcd-backup-restore.md)** - Control plane backup and recovery
+10. **[RBAC](docs/10-rbac.md)** - Role-Based Access Control
+11. **[Cluster Troubleshooting](docs/11-cluster-troubleshooting.md)** - Debugging cluster issues
 
 ### Quick References
 
