@@ -533,9 +533,6 @@ kubectl logs nginx-with-logger -c logger
 
 ```bash
 # Create the service first (postgres requires password)
-kubectl create deployment db --image=postgres:alpine --dry-run=client -o yaml > db-deployment.yaml
-
-# Add the required POSTGRES_PASSWORD environment variable
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -563,6 +560,12 @@ EOF
 # Expose the service
 kubectl expose deployment db --port=5432
 
+# Wait for postgres to be ready
+kubectl wait --for=condition=ready pod -l app=db --timeout=60s
+
+# Give postgres a few seconds to fully initialize
+sleep 10
+
 # Create pod with init container
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -572,16 +575,45 @@ metadata:
 spec:
   initContainers:
   - name: wait-for-db
-    image: busybox
-    command: ['sh', '-c', 'until nslookup db; do echo waiting; sleep 2; done']
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup db.default.svc.cluster.local; do echo waiting for db; sleep 2; done']
   
   containers:
   - name: app
     image: nginx
+    ports:
+    - containerPort: 80
 EOF
 
 # Watch it start
 kubectl get pod app-with-init --watch
+```
+
+**Troubleshooting Init Containers:**
+
+```bash
+# Check init container status
+kubectl get pod app-with-init
+
+# If stuck in Init:0/1, check init container logs
+kubectl logs app-with-init -c wait-for-db
+
+# Common issues:
+# 1. DNS not resolving - use full DNS name (db.default.svc.cluster.local)
+# 2. Service not ready - wait for db pod first
+# 3. Wrong busybox version - use busybox:1.28 for nslookup
+
+# Verify db service exists
+kubectl get svc db
+
+# Check if db pod is running
+kubectl get pods -l app=db
+
+# If app container won't start, describe pod
+kubectl describe pod app-with-init
+
+# Check app container logs (if it started)
+kubectl logs app-with-init -c app
 ```
 
 ### Exercise 3: Shared Volume Communication
