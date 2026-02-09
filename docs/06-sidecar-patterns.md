@@ -532,8 +532,35 @@ kubectl logs nginx-with-logger -c logger
 **Task:** Create pod that waits for a service before starting.
 
 ```bash
-# Create the service first
-kubectl create deployment db --image=postgres:alpine
+# Create the service first (postgres requires password)
+kubectl create deployment db --image=postgres:alpine --dry-run=client -o yaml > db-deployment.yaml
+
+# Add the required POSTGRES_PASSWORD environment variable
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:alpine
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "mysecretpassword"
+        ports:
+        - containerPort: 5432
+EOF
+
+# Expose the service
 kubectl expose deployment db --port=5432
 
 # Create pod with init container
