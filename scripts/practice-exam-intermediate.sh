@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Kubernetes CKA Study Guide - Beginner Practice Exam
-# 8 tasks, 60 minutes
+# Kubernetes CKA Study Guide - Intermediate Practice Exam
+# 12 tasks, 90 minutes
 # Interactive version - No spoilers!
 
 set -e
@@ -16,7 +16,7 @@ NC='\033[0m'
 
 # Score tracking
 SCORE=0
-TOTAL=8
+TOTAL=12
 
 # Timer function - shows live clock and elapsed time
 show_timer() {
@@ -126,23 +126,25 @@ check_prerequisites() {
 cleanup() {
     echo ""
     echo -e "${YELLOW}Cleaning up exam resources...${NC}"
-    kubectl delete namespace exam-beginner --ignore-not-found=true
+    kubectl delete namespace exam-intermediate --ignore-not-found=true
+    kubectl delete namespace production --ignore-not-found=true
+    kubectl delete pv exam-pv --ignore-not-found=true
     kubectl config set-context --current --namespace=default
     print_success "Cleanup complete"
 }
 
 # Main exam
 clear
-print_header "CKA BEGINNER PRACTICE EXAM"
-echo -e "${YELLOW}Time Limit:${NC} 60 minutes"
-echo -e "${YELLOW}Passing Score:${NC} 5/8 tasks (63%)"
+print_header "CKA INTERMEDIATE PRACTICE EXAM"
+echo -e "${YELLOW}Time Limit:${NC} 90 minutes"
+echo -e "${YELLOW}Passing Score:${NC} 8/12 tasks (67%)"
 echo -e "${YELLOW}Format:${NC} Complete tasks, validation after each"
 echo ""
 echo -e "${CYAN}Instructions:${NC}"
 echo "• Read each task carefully"
 echo "• Complete the task using kubectl"
 echo "• Press ENTER when done to validate"
-echo "• Solutions shown only if you want them"
+echo "• Solution shown after each task"
 echo ""
 read -p "Press ENTER to start the exam..."
 
@@ -150,9 +152,9 @@ check_prerequisites
 
 # Create exam namespace
 print_header "Setting Up Exam Environment"
-kubectl create namespace exam-beginner --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
-kubectl config set-context --current --namespace=exam-beginner &>/dev/null
-print_success "Namespace 'exam-beginner' created and set"
+kubectl create namespace exam-intermediate --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+kubectl config set-context --current --namespace=exam-intermediate &>/dev/null
+print_success "Namespace 'exam-intermediate' created and set"
 sleep 1
 
 # Start timer and chronometer
@@ -167,142 +169,354 @@ sleep 2
 # TASK 1
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "1" "Create a pod named 'nginx-pod' using the image 'nginx:alpine'
+print_task "1" "Create a pod with multiple containers (sidecar pattern)
 
 Requirements:
-  • Pod name: nginx-pod
-  • Image: nginx:alpine
-  • Namespace: exam-beginner (already set)"
+  • Pod name: multi-container
+  • Container 1: nginx (image: nginx)
+  • Container 2: logger (image: busybox, command: sleep 3600)"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get pod nginx-pod -n exam-beginner" \
-    "kubectl run nginx-pod --image=nginx:alpine"
+    "kubectl get pod multi-container -n exam-intermediate && [ \$(kubectl get pod multi-container -n exam-intermediate -o jsonpath='{.spec.containers[*].name}' | wc -w) -eq 2 ]" \
+    "kubectl run multi-container --image=nginx --dry-run=client -o yaml > multi.yaml
+# Edit to add second container:
+# spec:
+#   containers:
+#   - name: nginx
+#     image: nginx
+#   - name: logger
+#     image: busybox
+#     command: ['sleep', '3600']
+kubectl apply -f multi.yaml"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 2
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "2" "Create a deployment named 'web-app' with 3 replicas
+print_task "2" "Create a Secret and use it in a pod
 
 Requirements:
-  • Deployment name: web-app
-  • Image: nginx:alpine
-  • Replicas: 3"
+  • Secret name: db-secret
+  • Key: password, Value: mysecretpass
+  • Pod name: secret-pod (image: nginx)
+  • Mount secret as environment variable DB_PASSWORD"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get deployment web-app -n exam-beginner && [ \$(kubectl get deployment web-app -n exam-beginner -o jsonpath='{.spec.replicas}') -eq 3 ]" \
-    "kubectl create deployment web-app --image=nginx:alpine --replicas=3"
+    "kubectl get secret db-secret -n exam-intermediate && kubectl get pod secret-pod -n exam-intermediate" \
+    "kubectl create secret generic db-secret --from-literal=password=mysecretpass
+
+kubectl run secret-pod --image=nginx --dry-run=client -o yaml > secret-pod.yaml
+# Edit to add env:
+#   env:
+#   - name: DB_PASSWORD
+#     valueFrom:
+#       secretKeyRef:
+#         name: db-secret
+#         key: password
+kubectl apply -f secret-pod.yaml"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 3
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "3" "Expose the 'web-app' deployment as a service
+print_task "3" "Create a PersistentVolume and PersistentVolumeClaim
 
 Requirements:
-  • Service name: web-service
-  • Port: 80
-  • Target: web-app deployment"
+  • PV name: exam-pv
+  • Storage: 1Gi
+  • Access mode: ReadWriteOnce
+  • hostPath: /mnt/data
+  • PVC name: exam-pvc
+  • Request: 500Mi"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get service web-service -n exam-beginner && [ \$(kubectl get service web-service -n exam-beginner -o jsonpath='{.spec.ports[0].port}') -eq 80 ]" \
-    "kubectl expose deployment web-app --port=80 --name=web-service"
+    "kubectl get pv exam-pv && kubectl get pvc exam-pvc -n exam-intermediate" \
+    "cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: exam-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: /mnt/data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: exam-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+EOF"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 4
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "4" "Scale the 'web-app' deployment to 5 replicas
+print_task "4" "Create a NetworkPolicy to restrict access
 
 Requirements:
-  • Deployment: web-app
-  • New replica count: 5"
+  • Create pod: backend (label: app=backend, image: nginx)
+  • Create pod: frontend (label: app=frontend, image: nginx)
+  • NetworkPolicy name: backend-policy
+  • Allow ONLY frontend to access backend on port 80"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "[ \$(kubectl get deployment web-app -n exam-beginner -o jsonpath='{.spec.replicas}') -eq 5 ]" \
-    "kubectl scale deployment web-app --replicas=5"
+    "kubectl get networkpolicy backend-policy -n exam-intermediate" \
+    "kubectl run backend --image=nginx --labels=app=backend
+kubectl run frontend --image=nginx --labels=app=frontend
+
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 80
+EOF"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 5
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "5" "Create a ConfigMap with application configuration
+print_task "5" "Create a ServiceAccount and use it in a pod
 
 Requirements:
-  • ConfigMap name: app-config
-  • Key: environment
-  • Value: development"
+  • ServiceAccount name: app-sa
+  • Pod name: sa-pod (image: nginx)
+  • Use the app-sa ServiceAccount"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get configmap app-config -n exam-beginner && [ \"\$(kubectl get configmap app-config -n exam-beginner -o jsonpath='{.data.environment}')\" = \"development\" ]" \
-    "kubectl create configmap app-config --from-literal=environment=development"
+    "kubectl get serviceaccount app-sa -n exam-intermediate && kubectl get pod sa-pod -n exam-intermediate" \
+    "kubectl create serviceaccount app-sa
+
+kubectl run sa-pod --image=nginx --serviceaccount=app-sa
+# Or edit YAML:
+# spec:
+#   serviceAccountName: app-sa"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 6
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "6" "Create a pod that runs a long-running process
+print_task "6" "Create a Job that runs to completion
 
 Requirements:
-  • Pod name: busybox-test
+  • Job name: batch-job
   • Image: busybox
-  • Command: sleep 3600"
+  • Command: echo 'Hello from job'
+  • Completions: 3"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get pod busybox-test -n exam-beginner" \
-    "kubectl run busybox-test --image=busybox -- sleep 3600"
+    "kubectl get job batch-job -n exam-intermediate" \
+    "kubectl create job batch-job --image=busybox --dry-run=client -o yaml -- echo 'Hello from job' > job.yaml
+# Edit to add completions: 3
+# spec:
+#   completions: 3
+kubectl apply -f job.yaml"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 7
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "7" "Set resource requests for the 'web-app' deployment
+print_task "7" "Create a CronJob
 
 Requirements:
-  • Deployment: web-app
-  • CPU request: 100m
-  • Memory request: 128Mi"
+  • CronJob name: hourly-job
+  • Schedule: Every hour (0 * * * *)
+  • Image: busybox
+  • Command: date"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get deployment web-app -n exam-beginner -o yaml | grep -q 'cpu: 100m' && kubectl get deployment web-app -n exam-beginner -o yaml | grep -q 'memory: 128Mi'" \
-    "kubectl set resources deployment web-app --requests=cpu=100m,memory=128Mi"
+    "kubectl get cronjob hourly-job -n exam-intermediate" \
+    "kubectl create cronjob hourly-job --image=busybox --schedule='0 * * * *' -- date"
 
 #═══════════════════════════════════════════════════════════════
 # TASK 8
 #═══════════════════════════════════════════════════════════════
 clear
-print_task "8" "Create a new namespace
+print_task "8" "Create a ResourceQuota
 
 Requirements:
-  • Namespace name: production"
+  • ResourceQuota name: compute-quota
+  • Max pods: 10
+  • Max CPU requests: 4 cores
+  • Max memory requests: 8Gi"
 
 echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
 read -p ""
 
 validate_and_score \
-    "kubectl get namespace production" \
-    "kubectl create namespace production"
+    "kubectl get resourcequota compute-quota -n exam-intermediate" \
+    "cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quota
+spec:
+  hard:
+    pods: '10'
+    requests.cpu: '4'
+    requests.memory: 8Gi
+EOF"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 9
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "9" "Create a DaemonSet
+
+Requirements:
+  • DaemonSet name: log-collector
+  • Image: fluentd
+  • Should run on all nodes"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get daemonset log-collector -n exam-intermediate" \
+    "kubectl create deployment log-collector --image=fluentd --dry-run=client -o yaml > ds.yaml
+# Change kind to DaemonSet and remove replicas
+# kind: DaemonSet
+# Remove: replicas, strategy
+kubectl apply -f ds.yaml"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 10
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "10" "Create a pod with init container
+
+Requirements:
+  • Pod name: init-demo
+  • Init container: wait-service (image: busybox, command: sleep 10)
+  • Main container: app (image: nginx)"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get pod init-demo -n exam-intermediate" \
+    "cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-demo
+spec:
+  initContainers:
+  - name: wait-service
+    image: busybox
+    command: ['sleep', '10']
+  containers:
+  - name: app
+    image: nginx
+EOF"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 11
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "11" "Create a StatefulSet
+
+Requirements:
+  • StatefulSet name: web
+  • Replicas: 3
+  • Image: nginx
+  • Service name: nginx (headless service)"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get statefulset web -n exam-intermediate && kubectl get service nginx -n exam-intermediate" \
+    "kubectl create service clusterip nginx --tcp=80:80 --clusterip=None
+
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+EOF"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 12
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "12" "Create a HorizontalPodAutoscaler
+
+Requirements:
+  • Target deployment: web-app (create if not exists)
+  • Min replicas: 2
+  • Max replicas: 10
+  • CPU target: 50%"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get hpa -n exam-intermediate" \
+    "# Ensure deployment exists with resource requests
+kubectl create deployment web-app --image=nginx --replicas=2 2>/dev/null || true
+kubectl set resources deployment web-app --requests=cpu=100m
+
+kubectl autoscale deployment web-app --min=2 --max=10 --cpu-percent=50"
 
 #═══════════════════════════════════════════════════════════════
 # FINAL SCORE
@@ -330,18 +544,18 @@ echo ""
 
 PERCENTAGE=$((SCORE * 100 / TOTAL))
 
-if [ $PERCENTAGE -ge 63 ]; then
+if [ $PERCENTAGE -ge 67 ]; then
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║                      PASSED! ✓                           ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${GREEN}Congratulations! You passed the beginner exam!${NC}"
+    echo -e "${GREEN}Congratulations! You passed the intermediate exam!${NC}"
 else
     echo -e "${YELLOW}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${YELLOW}║                   NEEDS IMPROVEMENT                      ║${NC}"
     echo -e "${YELLOW}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${YELLOW}Keep practicing! You need 5/8 to pass.${NC}"
+    echo -e "${YELLOW}Keep practicing! You need 8/12 to pass.${NC}"
 fi
 
 echo ""
@@ -349,11 +563,11 @@ echo -e "${BLUE}Grade: $PERCENTAGE%${NC}"
 echo ""
 
 if [ $PERCENTAGE -ge 90 ]; then
-    echo -e "${GREEN}🌟 Outstanding! Ready for intermediate level!${NC}"
-elif [ $PERCENTAGE -ge 75 ]; then
-    echo -e "${GREEN}Great job! Consider trying intermediate level.${NC}"
-elif [ $PERCENTAGE -ge 63 ]; then
-    echo -e "${YELLOW}Good! Practice more then try again.${NC}"
+    echo -e "${GREEN}🌟 Outstanding! Ready for advanced level!${NC}"
+elif [ $PERCENTAGE -ge 80 ]; then
+    echo -e "${GREEN}Great job! Consider trying advanced level.${NC}"
+elif [ $PERCENTAGE -ge 67 ]; then
+    echo -e "${YELLOW}Good! Practice more then try advanced.${NC}"
 else
     echo -e "${RED}Review the documentation and try again.${NC}"
 fi
@@ -364,8 +578,8 @@ echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     cleanup
 else
-    echo -e "${YELLOW}Resources left in namespace 'exam-beginner'${NC}"
-    echo -e "Clean up later with: kubectl delete namespace exam-beginner"
+    echo -e "${YELLOW}Resources left in namespace 'exam-intermediate'${NC}"
+    echo -e "Clean up later with: kubectl delete namespace exam-intermediate"
 fi
 
 echo ""
