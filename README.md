@@ -192,6 +192,30 @@ kubectl get nodes
 
 ## 🧪 Practice Exams
 
+### Interactive Practice Quizzes ⭐ NEW!
+
+**Exam-style quizzes with automatic validation and scoring!**
+
+```bash
+cd practice-scripts
+
+# NetworkPolicy Quiz (3 questions, 15 min)
+./network-policies-quiz.sh
+
+# RBAC Quiz (2 questions, 10 min)
+./rbac-quiz.sh
+```
+
+**Features:**
+- ✅ See question ONLY (no spoilers!)
+- ✅ Create your solution with kubectl
+- ✅ Automatic validation of your work
+- ✅ Instant scoring and feedback
+- ✅ See correct solution after each question
+- ✅ Final grade at the end
+
+See [practice-scripts/README.md](practice-scripts/README.md) for details.
+
 ### Available Practice Tests
 
 1. **[Beginner Practice Exam](examples/practice-exam-beginner.md)** - 8 tasks, 60 minutes

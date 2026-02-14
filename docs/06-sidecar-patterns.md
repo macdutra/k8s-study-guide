@@ -490,11 +490,66 @@ spec:
 EOF
 ```
 
-## Hands-On Practice
+## Practice Exercises
+
+Try these exercises on your own before looking at the solutions!
 
 ### Exercise 1: Create Sidecar Logging Pod
 
-**Task:** Create a pod with nginx and a logging sidecar.
+**Task:** Create a pod named `nginx-with-logger` that has:
+- Main container: nginx
+- Sidecar container: busybox that tails nginx access logs
+- Shared volume between containers for log files
+
+**Requirements:**
+- Use emptyDir volume named "logs"
+- nginx writes to /var/log/nginx
+- Sidecar reads from /logs
+- Sidecar should tail the access.log file
+
+**Test:** 
+- Make a request to nginx
+- Check logs in the sidecar container
+
+### Exercise 2: Init Container Setup
+
+**Task:** Create a pod named `app-with-init` that:
+- Has an init container that waits for a database service to be available
+- Only starts the main app container after the database is ready
+- First create a postgres deployment and service named "db"
+
+**Requirements:**
+- Init container: busybox that uses nslookup to check for db service
+- Main container: nginx
+- Init container should loop until db DNS resolves
+
+**Test:**
+- Watch the pod start (should show Init:0/1 then Running)
+- Verify init container completed before app started
+
+### Exercise 3: Shared Volume Communication
+
+**Task:** Create a pod named `file-share` with:
+- Producer container: writes messages to a file every 3 seconds
+- Consumer container: tails and displays those messages
+- Both containers share a volume
+
+**Requirements:**
+- Use emptyDir volume named "shared"
+- Producer writes to /data/messages.txt
+- Consumer tails /data/messages.txt
+- Producer should write 10 messages then exit
+
+**Test:**
+- Check consumer logs to see messages appearing
+- Verify producer has exited after writing all messages
+
+---
+
+## Solutions
+
+<details>
+<summary><b>Solution 1: Sidecar Logging Pod</b></summary>
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -527,9 +582,10 @@ kubectl exec nginx-with-logger -c nginx -- curl localhost
 kubectl logs nginx-with-logger -c logger
 ```
 
-### Exercise 2: Init Container Setup
+</details>
 
-**Task:** Create pod that waits for a service before starting.
+<details>
+<summary><b>Solution 2: Init Container Setup</b></summary>
 
 ```bash
 # Create the service first (postgres requires password)
@@ -589,7 +645,7 @@ EOF
 kubectl get pod app-with-init --watch
 ```
 
-**Troubleshooting Init Containers:**
+**Troubleshooting:**
 
 ```bash
 # Check init container status
@@ -598,27 +654,20 @@ kubectl get pod app-with-init
 # If stuck in Init:0/1, check init container logs
 kubectl logs app-with-init -c wait-for-db
 
-# Common issues:
-# 1. DNS not resolving - use full DNS name (db.default.svc.cluster.local)
-# 2. Service not ready - wait for db pod first
-# 3. Wrong busybox version - use busybox:1.28 for nslookup
-
 # Verify db service exists
 kubectl get svc db
 
 # Check if db pod is running
 kubectl get pods -l app=db
 
-# If app container won't start, describe pod
-kubectl describe pod app-with-init
-
 # Check app container logs (if it started)
 kubectl logs app-with-init -c app
 ```
 
-### Exercise 3: Shared Volume Communication
+</details>
 
-**Task:** Two containers communicating via shared file.
+<details>
+<summary><b>Solution 3: Shared Volume Communication</b></summary>
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -650,6 +699,10 @@ EOF
 # Watch the messages
 kubectl logs file-share -c consumer -f
 ```
+
+</details>
+
+---
 
 ## Troubleshooting
 

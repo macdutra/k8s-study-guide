@@ -513,6 +513,52 @@ EOF
 
 ## Hands-On Practice
 
+Try these exercises on your own before looking at the solutions!
+
+### Exercise 1: Three-Tier App Security
+
+**Task:** Set up a 3-tier application with network isolation:
+- Frontend tier (nginx)
+- Backend tier (nginx)
+- Database tier (postgres)
+
+**Requirements:**
+- Create 3 pods with labels: tier=frontend, tier=backend, tier=database
+- Create services for each tier
+- Apply a NetworkPolicy that:
+  - Allows ONLY backend to connect to database on port 5432
+  - Blocks frontend from accessing database directly
+  - Allows frontend to access backend
+
+**Test:**
+- Before policy: All connections should work
+- After policy: Frontend → database should be blocked
+- After policy: Backend → database should work
+
+### Exercise 2: Namespace Isolation
+
+**Task:** Create namespace-level isolation:
+- Create two namespaces: prod and dev
+- Create identical apps in both namespaces
+- Apply NetworkPolicy to isolate prod namespace
+
+**Requirements:**
+- Both namespaces have a pod named "app" (nginx)
+- Both have a service exposing port 80
+- Label prod namespace: environment=production
+- Label dev namespace: environment=development
+- NetworkPolicy in prod allows ONLY traffic from prod namespace pods
+
+**Test:**
+- dev → prod: should be BLOCKED
+- prod → prod: should work
+- dev → dev: should work
+- prod → dev: should work
+
+---
+
+## Solutions
+
 ### Understanding Pod Roles in NetworkPolicy Testing
 
 **Important:** For NetworkPolicy testing, use nginx for web tier pods (frontend, backend) and postgres for database tier.
@@ -535,9 +581,10 @@ EOF
 - ❌ Exposing busybox on port 80 creates service pointing to nothing
 - ❌ Can't test if NetworkPolicy blocks vs. no server running
 
-### Exercise 1: Three-Tier App Security
+<details>
+<summary><b>Solution 1: Three-Tier App Security</b></summary>
 
-Setup a 3-tier app with proper network isolation.
+**Complete Solution:**
 
 ```bash
 # Create pods - all using nginx for frontend and backend (simpler!)
@@ -609,10 +656,12 @@ kubectl exec frontend -- curl -m 2 http://backend | head -3
 - ✅ Simpler - same image, consistent setup
 - ✅ Realistic - microservice-to-microservice communication
 
+</details>
 
-### Exercise 2: Namespace Isolation
+<details>
+<summary><b>Solution 2: Namespace Isolation</b></summary>
 
-**Setup:** Use nginx for both pods. nginx has a web server (port 80) AND curl for testing.
+**Complete Solution:**
 
 ```bash
 # Create namespaces
@@ -704,6 +753,10 @@ kubectl exec -n prod app -- curl -m 2 http://app.dev.svc.cluster.local | head -3
 - ✅ More realistic - testing microservice-to-microservice communication
 
 **DNS Note:** Use full DNS name `app.prod.svc.cluster.local` if short name `app.prod` doesn't resolve.
+
+</details>
+
+---
 
 ## Troubleshooting
 
