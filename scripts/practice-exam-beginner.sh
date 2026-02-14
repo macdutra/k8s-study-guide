@@ -2,6 +2,7 @@
 
 # Kubernetes CKA Study Guide - Beginner Practice Exam
 # 8 tasks, 60 minutes
+# Interactive version - No spoilers!
 
 set -e
 
@@ -10,25 +11,59 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Score tracking
+SCORE=0
+TOTAL=8
 
 # Print functions
 print_header() {
-    echo -e "\n${BLUE}=====================================${NC}"
+    echo -e "\n${BLUE}══════════════════════════════════════════════════════════${NC}"
     echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}=====================================${NC}\n"
+    echo -e "${BLUE}══════════════════════════════════════════════════════════${NC}\n"
 }
 
 print_task() {
-    echo -e "${YELLOW}Task $1: $2${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║ Task $1 of $TOTAL${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}$2${NC}"
+    echo ""
 }
 
 print_success() {
     echo -e "${GREEN}✓ $1${NC}"
 }
 
-print_info() {
-    echo -e "${BLUE}ℹ $1${NC}"
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+validate_and_score() {
+    local validation_cmd=$1
+    local solution=$2
+    
+    echo -e "${BLUE}Validating your answer...${NC}"
+    sleep 1
+    
+    if eval "$validation_cmd" &>/dev/null; then
+        print_success "CORRECT! Task completed successfully"
+        SCORE=$((SCORE + 1))
+    else
+        print_error "Task not completed correctly"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}═══ Solution ═══${NC}"
+    echo -e "${CYAN}$solution${NC}"
+    echo ""
+    
+    echo -e "${BLUE}Current Score: $SCORE/$TOTAL${NC}"
+    echo ""
+    read -p "Press ENTER to continue to next task..."
 }
 
 # Check prerequisites
@@ -49,206 +84,239 @@ check_prerequisites() {
     print_success "Cluster accessible"
 }
 
+# Cleanup function
+cleanup() {
+    echo ""
+    echo -e "${YELLOW}Cleaning up exam resources...${NC}"
+    kubectl delete namespace exam-beginner --ignore-not-found=true
+    kubectl config set-context --current --namespace=default
+    print_success "Cleanup complete"
+}
+
 # Main exam
-print_header "Beginner Practice Exam - 8 Tasks"
-echo "Time Limit: 60 minutes"
-echo "Passing Score: 5/8 tasks (63%)"
+clear
+print_header "CKA BEGINNER PRACTICE EXAM"
+echo -e "${YELLOW}Time Limit:${NC} 60 minutes"
+echo -e "${YELLOW}Passing Score:${NC} 5/8 tasks (63%)"
+echo -e "${YELLOW}Format:${NC} Complete tasks, validation after each"
 echo ""
-read -p "Press Enter to start the exam..."
+echo -e "${CYAN}Instructions:${NC}"
+echo "• Read each task carefully"
+echo "• Complete the task using kubectl"
+echo "• Press ENTER when done to validate"
+echo "• Solutions shown only if you want them"
+echo ""
+read -p "Press ENTER to start the exam..."
 
 check_prerequisites
 
 # Create exam namespace
 print_header "Setting Up Exam Environment"
-kubectl create namespace exam-beginner --dry-run=client -o yaml | kubectl apply -f -
-kubectl config set-context --current --namespace=exam-beginner
-print_success "Namespace created and set"
+kubectl create namespace exam-beginner --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+kubectl config set-context --current --namespace=exam-beginner &>/dev/null
+print_success "Namespace 'exam-beginner' created and set"
+sleep 1
 
 # Start timer
 START_TIME=$(date +%s)
 
-print_header "Exam Tasks"
-echo "Complete the following 8 tasks. Solutions are at the end."
-echo ""
+#═══════════════════════════════════════════════════════════════
+# TASK 1
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "1" "Create a pod named 'nginx-pod' using the image 'nginx:alpine'
 
-# Task 1
-print_task "1" "Create a pod named 'nginx-pod' with image nginx:alpine"
-echo "Command: kubectl run nginx-pod --image=nginx:alpine"
-echo ""
-read -p "Press Enter when complete..."
+Requirements:
+  • Pod name: nginx-pod
+  • Image: nginx:alpine
+  • Namespace: exam-beginner (already set)"
 
-# Task 2
-print_task "2" "Create a deployment named 'web-app' with 3 replicas using nginx:alpine"
-echo "Command: kubectl create deployment web-app --image=nginx:alpine --replicas=3"
-echo ""
-read -p "Press Enter when complete..."
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
 
-# Task 3
-print_task "3" "Expose deployment 'web-app' as a service on port 80"
-echo "Command: kubectl expose deployment web-app --port=80 --name=web-service"
-echo ""
-read -p "Press Enter when complete..."
+validate_and_score \
+    "kubectl get pod nginx-pod -n exam-beginner" \
+    "kubectl run nginx-pod --image=nginx:alpine"
 
-# Task 4
-print_task "4" "Scale deployment 'web-app' to 5 replicas"
-echo "Command: kubectl scale deployment web-app --replicas=5"
-echo ""
-read -p "Press Enter when complete..."
+#═══════════════════════════════════════════════════════════════
+# TASK 2
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "2" "Create a deployment named 'web-app' with 3 replicas
 
-# Task 5
-print_task "5" "Create a ConfigMap named 'app-config' with key=value data: environment=development"
-echo "Command: kubectl create configmap app-config --from-literal=environment=development"
-echo ""
-read -p "Press Enter when complete..."
+Requirements:
+  • Deployment name: web-app
+  • Image: nginx:alpine
+  • Replicas: 3"
 
-# Task 6
-print_task "6" "Create a pod named 'busybox-test' with image busybox that runs 'sleep 3600'"
-echo "Command: kubectl run busybox-test --image=busybox -- sleep 3600"
-echo ""
-read -p "Press Enter when complete..."
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
 
-# Task 7
-print_task "7" "Set resource requests for deployment 'web-app': cpu=100m, memory=128Mi"
-echo "Command: kubectl set resources deployment web-app --requests=cpu=100m,memory=128Mi"
-echo ""
-read -p "Press Enter when complete..."
+validate_and_score \
+    "kubectl get deployment web-app -n exam-beginner && [ \$(kubectl get deployment web-app -n exam-beginner -o jsonpath='{.spec.replicas}') -eq 3 ]" \
+    "kubectl create deployment web-app --image=nginx:alpine --replicas=3"
 
-# Task 8
-print_task "8" "Create a namespace named 'production'"
-echo "Command: kubectl create namespace production"
-echo ""
-read -p "Press Enter when complete..."
+#═══════════════════════════════════════════════════════════════
+# TASK 3
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "3" "Expose the 'web-app' deployment as a service
 
-# End timer
+Requirements:
+  • Service name: web-service
+  • Port: 80
+  • Target: web-app deployment"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get service web-service -n exam-beginner && [ \$(kubectl get service web-service -n exam-beginner -o jsonpath='{.spec.ports[0].port}') -eq 80 ]" \
+    "kubectl expose deployment web-app --port=80 --name=web-service"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 4
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "4" "Scale the 'web-app' deployment to 5 replicas
+
+Requirements:
+  • Deployment: web-app
+  • New replica count: 5"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "[ \$(kubectl get deployment web-app -n exam-beginner -o jsonpath='{.spec.replicas}') -eq 5 ]" \
+    "kubectl scale deployment web-app --replicas=5"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 5
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "5" "Create a ConfigMap with application configuration
+
+Requirements:
+  • ConfigMap name: app-config
+  • Key: environment
+  • Value: development"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get configmap app-config -n exam-beginner && [ \"\$(kubectl get configmap app-config -n exam-beginner -o jsonpath='{.data.environment}')\" = \"development\" ]" \
+    "kubectl create configmap app-config --from-literal=environment=development"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 6
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "6" "Create a pod that runs a long-running process
+
+Requirements:
+  • Pod name: busybox-test
+  • Image: busybox
+  • Command: sleep 3600"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get pod busybox-test -n exam-beginner" \
+    "kubectl run busybox-test --image=busybox -- sleep 3600"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 7
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "7" "Set resource requests for the 'web-app' deployment
+
+Requirements:
+  • Deployment: web-app
+  • CPU request: 100m
+  • Memory request: 128Mi"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get deployment web-app -n exam-beginner -o yaml | grep -q 'cpu: 100m' && kubectl get deployment web-app -n exam-beginner -o yaml | grep -q 'memory: 128Mi'" \
+    "kubectl set resources deployment web-app --requests=cpu=100m,memory=128Mi"
+
+#═══════════════════════════════════════════════════════════════
+# TASK 8
+#═══════════════════════════════════════════════════════════════
+clear
+print_task "8" "Create a new namespace
+
+Requirements:
+  • Namespace name: production"
+
+echo -e "${YELLOW}Complete this task, then press ENTER to validate...${NC}"
+read -p ""
+
+validate_and_score \
+    "kubectl get namespace production" \
+    "kubectl create namespace production"
+
+#═══════════════════════════════════════════════════════════════
+# FINAL SCORE
+#═══════════════════════════════════════════════════════════════
+
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 MINUTES=$((DURATION / 60))
 SECONDS=$((DURATION % 60))
 
-print_header "Exam Complete!"
-echo "Time taken: ${MINUTES}m ${SECONDS}s"
+clear
+print_header "EXAM COMPLETE!"
+
+echo -e "${CYAN}Final Score: $SCORE / $TOTAL${NC}"
+echo -e "${CYAN}Time Taken: ${MINUTES}m ${SECONDS}s${NC}"
 echo ""
 
-# Verification
-print_header "Verifying Your Work"
-echo "Checking your solutions..."
-echo ""
+PERCENTAGE=$((SCORE * 100 / TOTAL))
 
-SCORE=0
-
-# Check Task 1
-echo -n "Task 1: "
-if kubectl get pod nginx-pod &> /dev/null; then
-    print_success "nginx-pod exists"
-    ((SCORE++))
+if [ $PERCENTAGE -ge 63 ]; then
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║                      PASSED! ✓                           ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${GREEN}Congratulations! You passed the beginner exam!${NC}"
 else
-    echo -e "${RED}✗ nginx-pod not found${NC}"
-fi
-
-# Check Task 2
-echo -n "Task 2: "
-if kubectl get deployment web-app &> /dev/null; then
-    print_success "web-app deployment exists"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ web-app deployment not found${NC}"
-fi
-
-# Check Task 3
-echo -n "Task 3: "
-if kubectl get service web-service &> /dev/null; then
-    print_success "web-service exists"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ web-service not found${NC}"
-fi
-
-# Check Task 4
-echo -n "Task 4: "
-REPLICAS=$(kubectl get deployment web-app -o jsonpath='{.spec.replicas}')
-if [ "$REPLICAS" == "5" ]; then
-    print_success "web-app scaled to 5 replicas"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ web-app has $REPLICAS replicas (expected 5)${NC}"
-fi
-
-# Check Task 5
-echo -n "Task 5: "
-if kubectl get configmap app-config &> /dev/null; then
-    print_success "app-config ConfigMap exists"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ app-config ConfigMap not found${NC}"
-fi
-
-# Check Task 6
-echo -n "Task 6: "
-if kubectl get pod busybox-test &> /dev/null; then
-    print_success "busybox-test pod exists"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ busybox-test pod not found${NC}"
-fi
-
-# Check Task 7
-echo -n "Task 7: "
-CPU_REQ=$(kubectl get deployment web-app -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}')
-if [ "$CPU_REQ" == "100m" ]; then
-    print_success "Resource requests set correctly"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ Resource requests not set correctly${NC}"
-fi
-
-# Check Task 8
-echo -n "Task 8: "
-if kubectl get namespace production &> /dev/null; then
-    print_success "production namespace exists"
-    ((SCORE++))
-else
-    echo -e "${RED}✗ production namespace not found${NC}"
-fi
-
-# Final score
-print_header "Final Score"
-echo "Score: $SCORE/8 ($(($SCORE * 100 / 8))%)"
-echo ""
-
-if [ $SCORE -ge 5 ]; then
-    print_success "PASSED! (Passing score: 5/8)"
-else
-    echo -e "${RED}Not passed. Passing score is 5/8.${NC}"
+    echo -e "${YELLOW}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${YELLOW}║                   NEEDS IMPROVEMENT                      ║${NC}"
+    echo -e "${YELLOW}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Keep practicing! You need 5/8 to pass.${NC}"
 fi
 
 echo ""
-echo "Time taken: ${MINUTES}m ${SECONDS}s"
-echo "Target time: 60 minutes"
+echo -e "${BLUE}Grade: $PERCENTAGE%${NC}"
 echo ""
 
-# Cleanup option
-read -p "Do you want to clean up the exam resources? (y/n) " -n 1 -r
-echo
+if [ $PERCENTAGE -ge 90 ]; then
+    echo -e "${GREEN}🌟 Outstanding! Ready for intermediate level!${NC}"
+elif [ $PERCENTAGE -ge 75 ]; then
+    echo -e "${GREEN}Great job! Consider trying intermediate level.${NC}"
+elif [ $PERCENTAGE -ge 63 ]; then
+    echo -e "${YELLOW}Good! Practice more then try again.${NC}"
+else
+    echo -e "${RED}Review the documentation and try again.${NC}"
+fi
+
+echo ""
+read -p "Would you like to clean up exam resources? (y/n): " -n 1 -r
+echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Cleaning up..."
-    kubectl delete namespace exam-beginner
-    kubectl delete namespace production 2>/dev/null || true
-    print_success "Cleanup complete"
+    cleanup
+else
+    echo -e "${YELLOW}Resources left in namespace 'exam-beginner'${NC}"
+    echo -e "Clean up later with: kubectl delete namespace exam-beginner"
 fi
 
-print_header "Solutions Reference"
-cat << 'EOF'
-Task 1: kubectl run nginx-pod --image=nginx:alpine
-Task 2: kubectl create deployment web-app --image=nginx:alpine --replicas=3
-Task 3: kubectl expose deployment web-app --port=80 --name=web-service
-Task 4: kubectl scale deployment web-app --replicas=5
-Task 5: kubectl create configmap app-config --from-literal=environment=development
-Task 6: kubectl run busybox-test --image=busybox -- sleep 3600
-Task 7: kubectl set resources deployment web-app --requests=cpu=100m,memory=128Mi
-Task 8: kubectl create namespace production
-
-For detailed explanations, see the documentation in docs/
-EOF
-
 echo ""
-print_success "Exam complete! Good luck with your studies!"
+echo -e "${GREEN}Keep practicing! 🚀${NC}"
+echo ""
