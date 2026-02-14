@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-job
+spec:
+  completions: 3
+  template:
+    spec:
+      containers:
+      - name: batch-job-container
+        image: busybox
+        command: ["/usr/bin/echo"]
+        args:
+        - "Hello from job"
+      restartPolicy: Never
+  backoffLimit: 4

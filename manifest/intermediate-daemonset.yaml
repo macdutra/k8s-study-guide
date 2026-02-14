@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-container
+  template:
+    metadata:
+      labels:
+        name: fluentd-container
+    spec:
+      containers:
+      - name: fluentd-container
+        image: fluentd
+
